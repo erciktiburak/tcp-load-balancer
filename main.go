@@ -2,13 +2,16 @@ package main
 
 import (
 	"flag"
+	"fmt"
 	"io"
 	"log"
 	"net"
 )
 
 var (
-	listenAddr = flag.String("listen-addr", ":8080", "server listen address")
+	counter int
+
+	listenAddr = "localhost:8000"
 
 	// List of backend servers
 	server = []string{
@@ -23,7 +26,7 @@ func main() {
 	flag.Parse()
 
 	// Listen for incoming connections
-	listener, err := net.Listen("tcp", *listenAddr)
+	listener, err := net.Listen("tcp", listenAddr)
 	if err != nil {
 		log.Fatalf("failed to listen: %v", err)
 	}
@@ -34,14 +37,18 @@ func main() {
 		conn, err := listener.Accept()
 		if err != nil {
 			log.Printf("failed to accept connection: %v", err)
-			continue
 		}
 
 		// Choose a backend server
 		serverAddr := chooseServer()
-
+		fmt.Println("counter=%d backend=%s", counter, serverAddr)
 		// Start proxying data between client and server
-		go proxy(serverAddr, conn)
+		go func() {
+			err := proxy(serverAddr, conn)
+			if err != nil {
+				log.Printf("failed to proxy data: %v", err)
+			}
+		}()
 	}
 }
 
@@ -64,6 +71,7 @@ func proxy(serverAddr string, conn net.Conn) {
 
 // chooseServer selects a backend server to forward the request
 func chooseServer() string {
-	// For now, always choose the first server in the list
-	return server[0]
+	s := server[counter%len(server)]
+	counter++
+	return s
 }
